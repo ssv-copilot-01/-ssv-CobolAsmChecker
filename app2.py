@@ -1,152 +1,110 @@
 import streamlit as st
 import docx
-import google.generativeai as genai
+import gemini_service 
+import os
+from dotenv import load_dotenv
 
-# ==================================================
-# 0. CẤU HÌNH API KEY (SET CỨNG – KHÔNG NHẬP TAY)
-# ==================================================
-GEMINI_API_KEY = "AIzaSyDCSIqgoNl-3Hz0bTsgsf-R4JnL6XcBjf8"
+load_dotenv()
+api_key_status = os.getenv("GEMINI_API_KEY")
 
-# ==================================================
-# 1. ĐỌC FILE WORD (.docx)
-# ==================================================
+# ==========================================
+# UI HELPER
+# ==========================================
 def read_docx(file):
     try:
         doc = docx.Document(file)
-        texts = []
-        for p in doc.paragraphs:
-            if p.text.strip():
-                texts.append(p.text)
+        texts = [p.text for p in doc.paragraphs if p.text.strip()]
         return "\n".join(texts) if texts else "File Rules rỗng."
     except Exception as e:
         return f"Lỗi đọc file Word: {e}"
 
-# ==================================================
-# 2. ĐỌC FILE SOURCE CODE (.CBL / .COB)
-# ==================================================
-def read_code_file(file):
+def read_code_file(uploaded_file):
     try:
-        content = file.read().decode("utf-8", errors="ignore")
-        return content if content.strip() else "File code rỗng."
+        return uploaded_file.getvalue().decode("utf-8", errors="ignore")
     except Exception as e:
         return f"Lỗi đọc file code: {e}"
 
-# ==================================================
-# 3. GỌI GEMINI (FLASH – FREE TIER SAFE)
-# ==================================================
-def analyze_with_gemini(rules_text, source_code, language):
-    try:
-        genai.configure(api_key=GEMINI_API_KEY)
+# ==========================================
+# GIAO DIỆN CHÍNH
+# ==========================================
+st.set_page_config(page_title="AI Code Auditor", page_icon="🛡️", layout="wide")
 
-        model = genai.GenerativeModel(
-            model_name="models/gemini-1.5-flash"
-        )
-
-        prompt = f"""
-Bạn là Senior Code Auditor chuyên về {language}.
-
-[RULES]
-{rules_text}
-
-[CODE]
-{source_code}
-
-YÊU CẦU:
-- Chỉ liệt kê lỗi vi phạm
-- Trích dẫn dòng code sai
-- Giải thích ngắn gọn
-- Nếu không có lỗi, ghi đúng một dòng: ✅ CLEAN CODE
-"""
-
-        response = model.generate_content(prompt)
-        return response.text
-
-    except Exception as e:
-        msg = str(e)
-        if "429" in msg or "Quota" in msg:
-            return "⚠️ Hết quota tạm thời. Chờ 1–2 phút rồi thử lại."
-        if "404" in msg:
-            return "❌ Model không tồn tại hoặc API Key sai."
-        return f"❌ Lỗi hệ thống: {msg}"
-
-# ==================================================
-# 4. GIAO DIỆN STREAMLIT
-# ==================================================
-st.set_page_config(
-    page_title="SSV CODE CHECKER",
-    page_icon="⚡",
-    layout="wide"
-)
-
-st.title("⚡ SSV CODE CHECKER")
-st.caption("Gemini Flash – Free Tier – Internal Tool")
+st.title("🛡️ SSV CODE CHECKER")
+st.caption("Support: English-Vietnamese & English-Japanese (Bilingual)")
 st.markdown("---")
 
-# Sidebar
+# --- SIDEBAR ---
 with st.sidebar:
-    st.header("Rules")
-    rules_file = st.file_uploader(
-        "Upload file Quy chuẩn (.docx)",
-        type=["docx"]
+    st.header("1. Language Settings")
+    
+    # === MENU CHỌN NGÔN NGỮ ===
+    lang_choice = st.radio(
+        "Report Language:",
+        options=[
+            "🇻🇳 Anh - Việt (Technical)", 
+            "🇯🇵 Anh - Nhật (+Việt)"
+        ]
     )
+    
+    # Map sang mã code
+    style_code = 'en_vi' if "Anh - Việt" in lang_choice else 'en_jp'
+    
+    st.info(f"👉 **Mode:** {style_code.upper()}")
+    if style_code == 'en_vi':
+        st.caption("Technical Terms: English\nExplanation: Vietnamese")
+    else:
+        st.caption("Technical Terms: English\nExplanation: Japanese\nSub: Vietnamese")
 
-# Main
+    st.markdown("---")
+    st.header("2. Input Data")
+    uploaded_rule = st.file_uploader("Upload Rules (.docx)", type=["docx"])
+    
+    if api_key_status:
+        st.success("✅ API Key: OK")
+    else:
+        st.error("❌ API Key: Missing")
+
+# --- MAIN ---
 col1, col2 = st.columns([1, 1])
 
 with col1:
-    st.subheader("Input Code")
+    st.header("3. Source Code")
+    language = st.radio("Program Language:", ["COBOL", "ASSEMBLY"], horizontal=True)
+    
+    tab1, tab2 = st.tabs(["📝 Paste Code", "📁 Upload File"])
+    
+    final_code = ""
+    with tab1:
+        code_text = st.text_area("Paste code here:", height=400)
+        if code_text: final_code = code_text
+            
+    with tab2:
+        up_file = st.file_uploader("Choose file (.cbl, .asm)", type=['cbl', 'cob', 'asm', 'txt'])
+        if up_file: final_code = read_code_file(up_file)
 
-    language = st.radio(
-        "Ngôn ngữ",
-        ["COBOL", "ASSEMBLY"],
-        horizontal=True
-    )
-
-    input_mode = st.radio(
-        "Cách nhập code",
-        ["📁 Upload file (.CBL / .COB)", "✍️ Copy từng đoạn"],
-        horizontal=False
-    )
-
-    code_text = ""
-
-    if input_mode.startswith("📁"):
-        code_file = st.file_uploader(
-            "Upload file code",
-            type=["cbl", "cob"]
-        )
-        if code_file:
-            code_text = read_code_file(code_file)
-    else:
-        code_text = st.text_area(
-            "Dán code vào đây",
-            height=400
-        )
-
-    run_btn = st.button(
-        "🚀 KIỂM TRA",
-        type="primary",
-        use_container_width=True
-    )
+    st.markdown("---")
+    btn_run = st.button("🚀 START AUDIT", type="primary", use_container_width=True)
 
 with col2:
-    st.subheader("Kết quả")
-
-    if run_btn:
-        if not rules_file:
-            st.error("❌ Chưa upload file Rules (.docx)")
-        elif not code_text or code_text.startswith("File"):
-            st.error("❌ Chưa có code hợp lệ")
+    st.header("4. Audit Result")
+    
+    if btn_run:
+        if not api_key_status:
+            st.error("❌ Error: Missing .env file")
+        elif not uploaded_rule:
+            st.error("❌ Error: Missing Rules file")
+        elif not final_code.strip():
+            st.error("❌ Error: Missing Source Code")
         else:
-            with st.spinner("⚡ Gemini Flash đang phân tích..."):
-                rules = read_docx(rules_file)
-
-                if rules.startswith("Lỗi"):
-                    st.error(rules)
-                else:
-                    result = analyze_with_gemini(
-                        rules,
-                        code_text,
-                        language
-                    )
-                    st.markdown(result)
+            with st.spinner(f"AI is analyzing ({lang_choice})..."):
+                rules_content = read_docx(uploaded_rule)
+                
+                # Gọi Service với style_code
+                result = gemini_service.call_gemini_smart_fallback(
+                    rules_content, 
+                    final_code, 
+                    language,
+                    style_code
+                )
+                
+                st.markdown(result)

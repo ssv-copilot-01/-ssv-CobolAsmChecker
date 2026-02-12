@@ -1,3 +1,7 @@
+# Do Google thay đổi model liên tục, file này để bạn kiểm tra model nào đang hoạt động với API Key của bạn
+# Hãy chạy lại python check_model.py.
+# Lấy tên model mới cập nhật vào MODEL_LIST trong file gemini_service.py.
+# cau lenh de check: python check_model.py
 import os
 import requests
 from dotenv import load_dotenv

@@ -1,267 +1,157 @@
-python -m streamlit run app.py
-python -m pip install google-generativeai
- python.exe -m pip install --upgrade pip
- python -m pip install python-docx
+Dưới đây là phần **Setup Environment hoàn chỉnh** anh viết chuẩn README cho project của em.
+Em có thể copy nguyên khối này vào `README.md`.
+Savoy Blue rgb(65, 88, 208) 100%);
+---
 
- https://ai.google.dev/gemini-api/docs/libraries?hl=vi
-📘 MÔ TẢ CHI TIẾT CÔNG VIỆC
-XÂY DỰNG HỆ THỐNG SSV CODE CHECKER
+# 🚀 Environment Setup Guide
 
-1. MỤC TIÊU CÔNG VIỆC
-Xây dựng một web tool nội bộ cho phép kiểm tra mã nguồn (hiện tại là COBOL / Assembly) dựa trên quy chuẩn lập trình do khách hàng cung cấp dưới dạng tài liệu Word (.docx).
-Hệ thống sử dụng AI Gemini để:
-Đọc và hiểu nội dung quy chuẩn (ngôn ngữ tự nhiên).
+## 1️⃣ Clone Repository
 
+```bash
+git clone https://github.com/ssv-copilot-01/-ssv-CobolAsmChecker.git
+cd -ssv-CobolAsmChecker
+```
 
-Đối chiếu trực tiếp quy chuẩn với mã nguồn.
+---
 
+## 2️⃣ Tạo Virtual Environment
 
-Phát hiện và báo cáo các vi phạm quy định lập trình.
+### 🔹 Windows (PowerShell)
 
+```powershell
+python -m venv .venv
+.\.venv\Scripts\activate
+```
 
-KHÔNG sử dụng rule cứng (if/else) để check, vì nội dung quy chuẩn thay đổi theo từng khách hàng và thường được mô tả bằng văn bản tự do.
+### 🔹 macOS / Linux
 
-2. PHẠM VI CHỨC NĂNG
-2.1 Input – Quy chuẩn (Rules)
-Người dùng upload file Word định dạng .docx.
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+```
 
+Sau khi activate thành công, terminal sẽ hiển thị:
 
-File có thể chứa:
+```bash
+(.venv)
+```
 
+---
 
-Tiếng Việt / tiếng Anh / pha trộn.
+## 3️⃣ Cập nhật pip (khuyến nghị)
 
+```bash
+python -m pip install --upgrade pip
+```
 
-Bullet point, đoạn văn, bảng hoặc text thường.
+---
 
+## 4️⃣ Cài đặt Dependencies
 
-Hệ thống chỉ cần trích xuất toàn bộ text, không cần parse cấu trúc.
+Đảm bảo project có file:
 
+```
+requirements.txt
+```
 
-Nội dung sau khi đọc sẽ được gửi nguyên văn cho AI xử lý.
+Nội dung mẫu:
 
-
-📌 Không yêu cầu chuẩn hóa format Rules.
-
-2.2 Input – Mã nguồn (Source Code)
-Hệ thống hỗ trợ 2 cách nhập code:
-Cách 1: Upload file code
-Định dạng hỗ trợ:
-
-
-.CBL
-
-
-.COB
-
-
-Đọc toàn bộ nội dung file (UTF-8, ignore error).
-
-
-Dùng cho việc check toàn bộ chương trình.
-
-
-Cách 2: Copy & Paste code
-Text area để dán từng đoạn code.
-
-
-Dùng cho việc check logic nhỏ hoặc đoạn code đang chỉnh sửa.
-
-
-📌 Nếu người dùng upload file → ưu tiên nội dung file
- 📌 Nếu không upload file → dùng nội dung text area
-
-2.3 Xử lý chính – AI Review Engine
-Sử dụng Google Gemini API.
-
-
-Chỉ sử dụng model: gemini
-
-
-
-AI đóng vai:
-
-
- Senior Code Auditor chuyên COBOL / Assembly
-
-
-
-AI nhận 3 input:
-Nội dung Rules (text từ Word)
-
-
-Mã nguồn
-
-
-Ngôn ngữ (COBOL hoặc ASSEMBLY)
-
-
-
-2.4 Prompt & Logic đánh giá
-AI được yêu cầu:
-Chỉ kiểm tra dựa trên Rules được cung cấp.
-
-
-Không tự suy diễn thêm quy tắc bên ngoài.
-
-
-Chỉ trả về:
-
-
-Các lỗi vi phạm quy chuẩn.
-
-
-Dòng code liên quan.
-
-
-Giải thích ngắn gọn.
-
-
-Nếu không có lỗi:
-
-
-Trả về đúng 1 dòng:
- ✅ CLEAN CODE
-
-
-📌 Không yêu cầu fix code, chỉ phát hiện vi phạm.
-
-2.5 Output – Kết quả kiểm tra
-Kết quả hiển thị trực tiếp trên giao diện web.
-
-
-Có thể bao gồm:
-
-
-Danh sách lỗi.
-
-
-Mô tả lỗi.
-
-
-Trích dẫn code.
-
-
-Không lưu trữ kết quả sau khi reload trang.
-
-
-
-3. GIAO DIỆN NGƯỜI DÙNG (UI)
-Xây dựng bằng Streamlit.
-
-
-Bố cục:
-
-
-Sidebar: Upload Rules.
-
-
-Main:
-
-
-Chọn ngôn ngữ.
-
-
-Chọn cách nhập code (Upload file / Copy).
-
-
-Button “Kiểm tra”.
-
-
-Vùng hiển thị kết quả.
-
-
-UI đơn giản, dễ dùng, hướng đến nội bộ.
-
-
-
-4. YÊU CẦU KỸ THUẬT
-4.1 Backend / Logic
-Python 3.x
-
-
-Thư viện:
-
-
+```
 streamlit
-
-
+python-dotenv
+requests
 python-docx
+```
 
+Cài đặt:
 
-google-generativeai
+```bash
+pip install -r requirements.txt
+```
 
+---
 
-Không cần database.
+## 5️⃣ Cấu hình API Key (.env)
 
+Tạo file `.env` trong thư mục gốc project:
 
-Không cần authentication.
+```
+GEMINI_API_KEY=your_api_key_here
+```
 
+⚠️ Không commit file `.env` lên GitHub.
+Đảm bảo `.gitignore` có dòng:
 
+```
+.env
+```
 
-4.2 API Key
-API Key của Gemini được set cứng trong code.
+---
 
+## 6️⃣ (Tuỳ chọn) Kiểm tra Model khả dụng
 
-Không cho người dùng nhập trên UI.
+```bash
+python check_model.py
+```
 
+Script sẽ hiển thị danh sách model mà API Key của bạn có thể sử dụng.
 
-Dùng cho môi trường nội bộ.
+---
 
+## 7️⃣ Chạy Ứng Dụng
 
+```bash
+python -m streamlit run app.py
+```
 
-4.3 Xử lý lỗi
-Nếu lỗi quota (429):
+Sau khi chạy thành công:
 
+```
+Local URL: http://localhost:8501
+```
 
-Hiển thị thông báo chờ và retry.
+Mở trình duyệt và truy cập link trên.
 
+---
 
-Nếu lỗi model (404):
+# 🛠 Kiểm Tra Python Đang Sử Dụng
 
+Để đảm bảo đang dùng đúng virtual environment:
 
-Thông báo cấu hình sai hoặc key không hợp lệ.
+### Windows
 
+```bash
+where python
+```
 
-Không crash app.
+Phải hiển thị đường dẫn dạng:
 
+```
+...\CobolAsmChecker\.venv\Scripts\python.exe
+```
 
+---
 
-5. GIỚI HẠN & LƯU Ý
-Tool chỉ hỗ trợ kiểm tra, không thay thế review cuối cùng của con người.
+# 📦 Re-Setup From Scratch (Khi Clone Mới)
 
+```bash
+python -m venv .venv
+.\.venv\Scripts\activate   # hoặc source .venv/bin/activate
+pip install -r requirements.txt
+streamlit run app.py
+```
 
-Kết quả phụ thuộc vào:
+---
 
+# ✅ Yêu Cầu Hệ Thống
 
-Chất lượng Rules.
+* Python 3.10+
+* Internet connection (để gọi Gemini API)
 
+---
 
-Nội dung code.
+Nếu em muốn, anh có thể viết thêm:
 
-
-Không dùng cho mục đích đánh giá bảo mật hoặc performance.
-
-
-
-6. KẾT QUẢ MONG MUỐN
-Sau khi hoàn thành, hệ thống cho phép:
-Review nhanh code theo từng khách hàng.
-
-
-Áp dụng cho dự án legacy (COBOL).
-
-
-Giảm thời gian review thủ công cho senior/leader.
-
-
-Dùng làm công cụ training và checklist chất lượng code.
-
-
-
-7. MỨC ĐỘ HOÀN THÀNH
-✔️ Chạy được end-to-end
- ✔️ Không lỗi quota free tier
- ✔️ Dev khác có thể maintain
- ✔️ Phù hợp triển khai nội bộ
-
+* 🔹 phần **Project Structure**
+* 🔹 phần **Deployment Guide**
+* 🔹 hoặc bản README chuẩn “Professional Open Source” level GitHub ⭐
