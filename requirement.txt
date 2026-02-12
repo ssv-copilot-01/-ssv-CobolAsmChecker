@@ -1,4 +1,4 @@
 streamlit
+python-dotenv
 google-generativeai
 python-docx
-<img data-lazyloaded="1" src="https://ssv-corp.com/wp-content/uploads/2024/05/ssv-logo2.svg" id="image-9-7" alt="" data-src="https://ssv-corp.com/wp-content/uploads/2024/05/ssv-logo2.svg" class="ct-image entered litespeed-loaded" data-srcset="" data-sizes="(max-width: 150px) 100vw, 150px" data-ll-status="loaded" sizes="(max-width: 150px) 100vw, 150px">
