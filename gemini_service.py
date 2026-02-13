@@ -34,44 +34,72 @@ def delay(seconds):
 # ==========================================
 # 3. HÀM GỌI API (REST)
 # ==========================================
-def call_gemini_smart_fallback(rules_text, source_code, language):
+def call_gemini_smart_fallback(rules_content, code_content, language, style_code):
     if not API_KEY:
         return "❌ Lỗi: Chưa có API Key."
 
+    # ==============================
+    # 1. STYLE CONFIG
+    # ==============================
+    if style_code == "en_vi":
+        style_instruction = """
+        Write the report in English (technical tone).
+        After each section, add Vietnamese explanation.
+        """
+    else:
+        style_instruction = """
+        Write the report in English.
+        Add Japanese explanation.
+        Add Vietnamese explanation.
+        """
+
+    # ==============================
+    # 2. BUILD PROMPT
+    # ==============================
     user_prompt = f"""
-    ROLE: Senior Code Auditor ({language}).
-    TASK: Check the code below against the RULES provided.
-    
-    [RULES]:
-    {rules_text}
+ROLE: Senior Code Auditor ({language})
 
-    [CODE]:
-    {source_code}
+TASK:
+Check the SOURCE CODE against the RULES.
 
-    OUTPUT REQUEST:
-    1. List violations (Lỗi vi phạm).
-    2. Quote the wrong code.
-    3. Explain briefly.
-    4. If clean, say: "✅ CLEAN CODE".
-    """
+================ RULES ================
+{rules_content}
+
+================ SOURCE CODE ================
+{code_content}
+
+================ REPORT STYLE ================
+{style_instruction}
+
+OUTPUT REQUIREMENTS:
+1. List violations
+2. Quote problematic code
+3. Explain briefly
+4. Suggest fix
+5. If clean, say: "✅ CLEAN CODE"
+"""
 
     print("🚀 Bắt đầu quy trình Smart Fallback...")
     last_error = None
 
+    # ==============================
+    # 3. MODEL LOOP
+    # ==============================
     for model_name in MODEL_LIST:
         try:
             print(f"🔄 Đang thử model: {model_name}...")
-            
-            # URL chuẩn
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={API_KEY}"
-            
-            headers = {'Content-Type': 'application/json'}
-            payload = {"contents": [{"parts": [{"text": user_prompt}]}]}
 
-            # Timeout 30s
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={API_KEY}"
+
+            headers = {'Content-Type': 'application/json'}
+            payload = {
+                "contents": [
+                    {"parts": [{"text": user_prompt}]}
+                ]
+            }
+
             response = requests.post(url, headers=headers, json=payload, timeout=30)
-            
-            # --- PHÂN TÍCH KẾT QUẢ ---
+
             if response.status_code == 200:
                 try:
                     data = response.json()
@@ -79,21 +107,21 @@ def call_gemini_smart_fallback(rules_text, source_code, language):
                     print(f"✅ THÀNH CÔNG: {model_name}")
                     return f"🚀 **Model: {model_name}**\n\n{text}"
                 except:
-                    print(f"⚠️ {model_name}: 200 OK nhưng không có nội dung (Safety Filter).")
+                    print(f"⚠️ {model_name}: 200 OK nhưng không có nội dung.")
                     continue
 
             elif response.status_code == 429:
-                print(f"⚠️ {model_name}: Quá tải (429 Quota). Đang thử model tiếp theo...")
-                last_error = "Hết lượt truy cập (Quota Exceeded)."
-                delay(1) # Chờ 1 chút trước khi thử cái sau
+                print(f"⚠️ {model_name}: Quota 429. Thử model tiếp theo...")
+                last_error = "Quota Exceeded"
+                delay(1)
                 continue
 
             elif response.status_code == 404:
-                print(f"⚠️ {model_name}: Không tìm thấy (404).")
-                continue 
-            
+                print(f"⚠️ {model_name}: 404 Not Found.")
+                continue
+
             else:
-                print(f"⚠️ {model_name}: Lỗi HTTP {response.status_code}")
+                print(f"⚠️ {model_name}: HTTP {response.status_code}")
                 last_error = response.text
                 continue
 
