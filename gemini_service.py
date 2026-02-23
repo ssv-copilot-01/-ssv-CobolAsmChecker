@@ -1,134 +1,142 @@
 import os
 import time
 import requests
-import json
 from dotenv import load_dotenv
 
-# ==========================================
-# 1. LOAD KEY
-# ==========================================
-load_dotenv() 
+load_dotenv()
 API_KEY = os.getenv("GEMINI_API_KEY")
 
-if not API_KEY:
-    print("❌ [Service] Lỗi: Không đọc được GEMINI_API_KEY từ .env")
-else:
-    print(f"✅ [Service] Key loaded: {API_KEY[:5]}...*****")
-
-# ==========================================
-# 2. DANH SÁCH MODEL (CẬP NHẬT THEO KEY CỦA BẠN)
-# ==========================================
-# Đây là danh sách dựa trên kết quả check_model.py của bạn
-# Sắp xếp theo thứ tự: Ổn định/Nhẹ -> Mạnh mẽ -> Mới nhất
+# Ưu tiên Lite và Flash mới nhất
 MODEL_LIST = [
-    "gemini-flash-latest",     # 1. Alias an toàn nhất (thường trỏ về bản ổn định hiện tại)
-    "gemini-2.0-flash-lite",   # 2. Bản Lite (Nhẹ, nhanh, ít bị lỗi Quota 429 nhất)
-    "gemini-2.0-flash",        # 3. Bản Flash 2.0 chuẩn (Nếu Lite lỗi thì dùng cái này)
-    "gemini-2.5-flash",        # 4. Bản 2.5 mới nhất (Mạnh nhưng có thể chưa ổn định)
-    "gemini-2.0-flash-001",    # 5. Bản backup cụ thể
+    "gemini-2.0-flash-lite", 
+    "gemini-flash-lite-latest",
+    "gemini-1.5-flash",
+    "gemini-2.0-flash"
 ]
 
 def delay(seconds):
     time.sleep(seconds)
 
+def add_ruler_to_code(source_code):
+    ruler = "....+....1....+....2....+....3....+....4....+....5....+....6....+....7....+....8"
+    return f"RULER:\n{ruler}\n{source_code}"
+
 # ==========================================
-# 3. HÀM GỌI API (REST)
+# PROMPT BUILDER (ROBOT MODE - NO CHITCHAT)
 # ==========================================
-def call_gemini_smart_fallback(rules_content, code_content, language, style_code):
-    if not API_KEY:
-        return "❌ Lỗi: Chưa có API Key."
+def build_prompt(lang_code, rules_text, source_code, lang_prog):
+    
+    code_with_ruler = add_ruler_to_code(source_code)
 
-    # ==============================
-    # 1. STYLE CONFIG
-    # ==============================
-    if style_code == "en_vi":
-        style_instruction = """
-        Write the report in English (technical tone).
-        After each section, add Vietnamese explanation.
+    hard_rules = """
+    QUY TẮC CỨNG VỀ CỘT (HARD COLUMN RULES):
+    1. DIVISION/SECTION Header: Phải bắt đầu ở Cột 41 (Area B sâu).
+    2. PIC/PICTURE: Phải bắt đầu ở Cột 41.
+    3. Level 01: Cột 8-11 (Area A).
+    4. Độ dài dòng: Tối đa 72 ký tự.
+    """
+
+    # CẤU HÌNH NGÔN NGỮ (VIỆT)
+    if lang_code == 'vi':
+        system_instruction = """
+        BẠN LÀ MỘT ROBOT LINTER. NHIỆM VỤ CỦA BẠN LÀ TRẢ VỀ DANH SÁCH LỖI.
+        
+        ⛔️ QUY ĐỊNH CẤM (STRICT FORBIDDEN):
+        1. KHÔNG được chào hỏi ("Chào mừng...", "Dưới đây là...").
+        2. KHÔNG được giải thích quy trình ("Phân tích mã nguồn...", "Kiểm tra theo...").
+        3. KHÔNG chia nhóm lỗi ("Lỗi cột:", "Lỗi cú pháp:").
+        4. KHÔNG viết kết luận.
+        
+        ✅ YÊU CẦU OUTPUT DUY NHẤT:
+        Chỉ trả về các dòng lỗi nối tiếp nhau theo đúng định dạng sau:
+        
+        ❌ `[Line <Số dòng>] <Code gốc>`
+           ↳ **Lỗi:** <Tên lỗi ngắn gọn> (Theo Rule X).
+        
+        (Xuống dòng 2 lần giữa các lỗi)
+        
+        ❌ `[Line <Số dòng>] ...`
+           ↳ **Lỗi:** ...
+           
+        Nếu không có lỗi nào, chỉ ghi đúng 1 từ: "✅ CLEAN CODE".
         """
-    else:
-        style_instruction = """
-        Write the report in English.
-        Add Japanese explanation.
-        Add Vietnamese explanation.
+
+    # CẤU HÌNH NGÔN NGỮ (NHẬT)
+    else: 
+        system_instruction = """
+        あなたは厳格なコード検査ロボットです。
+        
+        ⛔️ 禁止事項 (STRICT FORBIDDEN):
+        1. 挨拶や導入文は一切禁止です ("こんにちは", "分析結果は..." 等)。
+        2. カテゴリ分け禁止 ("カラムエラー:", "構文エラー:" 等)。
+        3. 結論やまとめ禁止。
+        
+        ✅ 唯一の出力フォーマット:
+        エラーリストのみを以下の形式で出力してください：
+        
+        ❌ `[Line <行番号>] <元のコード>`
+           ↳ **エラー:** <簡潔なエラー内容> (Rule X).
+        
+        (エラー間は1行空けること)
+        
+        エラーがない場合のみ: "✅ CLEAN CODE" と出力。
         """
 
-    # ==============================
-    # 2. BUILD PROMPT
-    # ==============================
-    user_prompt = f"""
-ROLE: Senior Code Auditor ({language})
+    # GHÉP PROMPT
+    prompt = f"""
+    {system_instruction}
+    
+    [HARD RULES]:
+    {hard_rules}
+    
+    [DOCS RULES]:
+    {rules_text}
 
-TASK:
-Check the SOURCE CODE against the RULES.
+    [SOURCE CODE WITH RULER]:
+    {code_with_ruler}
+    
+    BẮT ĐẦU QUÉT VÀ CHỈ TRẢ VỀ LIST LỖI:
+    """
+    return prompt
 
-================ RULES ================
-{rules_content}
+# ==========================================
+# GỌI API
+# ==========================================
+def call_gemini_smart_fallback(rules_text, source_code, lang_prog, lang_ui_choice):
+    if not API_KEY: return "❌ Missing API Key"
 
-================ SOURCE CODE ================
-{code_content}
+    lang_code = 'vi' if 'Việt' in lang_ui_choice else 'ja'
+    user_prompt = build_prompt(lang_code, rules_text, source_code, lang_prog)
+    
+    print(f"🚀 Robot Audit ({lang_code})...")
 
-================ REPORT STYLE ================
-{style_instruction}
-
-OUTPUT REQUIREMENTS:
-1. List violations
-2. Quote problematic code
-3. Explain briefly
-4. Suggest fix
-5. If clean, say: "✅ CLEAN CODE"
-"""
-
-    print("🚀 Bắt đầu quy trình Smart Fallback...")
-    last_error = None
-
-    # ==============================
-    # 3. MODEL LOOP
-    # ==============================
     for model_name in MODEL_LIST:
         try:
-            print(f"🔄 Đang thử model: {model_name}...")
-
             url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={API_KEY}"
-
             headers = {'Content-Type': 'application/json'}
+            # Temperature = 0.0 để AI không "sáng tạo" thêm lời thoại
             payload = {
-                "contents": [
-                    {"parts": [{"text": user_prompt}]}
-                ]
+                "contents": [{"parts": [{"text": user_prompt}]}],
+                "generationConfig": {"temperature": 0.0}
             }
 
-            response = requests.post(url, headers=headers, json=payload, timeout=30)
-
+            response = requests.post(url, headers=headers, json=payload, timeout=60)
+            
             if response.status_code == 200:
                 try:
                     data = response.json()
                     text = data['candidates'][0]['content']['parts'][0]['text']
-                    print(f"✅ THÀNH CÔNG: {model_name}")
-                    return f"🚀 **Model: {model_name}**\n\n{text}"
-                except:
-                    print(f"⚠️ {model_name}: 200 OK nhưng không có nội dung.")
-                    continue
-
+                    # Xử lý cắt bỏ các dòng thừa nếu AI vẫn lỡ miệng nói
+                    cleaned_text = text.replace("```markdown", "").replace("```", "").strip()
+                    return f"🚀 **Model: {model_name}**\n\n{cleaned_text}"
+                except: continue
             elif response.status_code == 429:
-                print(f"⚠️ {model_name}: Quota 429. Thử model tiếp theo...")
-                last_error = "Quota Exceeded"
                 delay(1)
                 continue
+            else: continue
 
-            elif response.status_code == 404:
-                print(f"⚠️ {model_name}: 404 Not Found.")
-                continue
-
-            else:
-                print(f"⚠️ {model_name}: HTTP {response.status_code}")
-                last_error = response.text
-                continue
-
-        except Exception as e:
-            print(f"❌ Lỗi kết nối: {e}")
-            last_error = str(e)
+        except Exception:
             delay(1)
             continue
 
-    return f"❌ **THẤT BẠI:** Không model nào chạy được.\nLỗi cuối cùng: {last_error}"
+    return "❌ Service Unavailable."
