@@ -3,6 +3,7 @@ import docx
 import gemini_service
 import key_service
 import os
+import time
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -75,7 +76,7 @@ TRANSLATIONS = {
 }
 
 # ==========================================
-# 2. UI CONFIG & CSS (GIỮ NGUYÊN CSS ĐẸP)
+# 2. UI CONFIG & CSS
 # ==========================================
 st.set_page_config(page_title="SSV Code Auditor", page_icon="🛡️", layout="wide")
 

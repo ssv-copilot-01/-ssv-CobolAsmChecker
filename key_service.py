@@ -2,7 +2,6 @@ import os
 import streamlit as st
 import time  # THÊM
 from dotenv import load_dotenv
-import key_service  # <--- THÊM DÒNG NÀY
 
 # Load key hệ thống
 load_dotenv()

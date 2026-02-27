@@ -37,46 +37,42 @@ def build_prompt(lang_code, rules_text, source_code, lang_prog):
     4. Độ dài dòng: Tối đa 72 ký tự.
     """
 
-    # CẤU HÌNH NGÔN NGỮ (VIỆT)
+    # --- NẾU LÀ TIẾNG VIỆT ('vi') ---
     if lang_code == 'vi':
         system_instruction = """
-        BẠN LÀ MỘT ROBOT LINTER. NHIỆM VỤ CỦA BẠN LÀ TRẢ VỀ DANH SÁCH LỖI.
+        BẠN LÀ ROBOT LINTER. NHIỆM VỤ CỦA BẠN LÀ TRẢ VỀ DANH SÁCH LỖI.
         
         ⛔️ QUY ĐỊNH CẤM (STRICT FORBIDDEN):
         1. KHÔNG được chào hỏi ("Chào mừng...", "Dưới đây là...").
-        2. KHÔNG được giải thích quy trình ("Phân tích mã nguồn...", "Kiểm tra theo...").
-        3. KHÔNG chia nhóm lỗi ("Lỗi cột:", "Lỗi cú pháp:").
+        2. KHÔNG được giải thích quy trình.
+        3. KHÔNG chia nhóm lỗi.
         4. KHÔNG viết kết luận.
         
         ✅ YÊU CẦU OUTPUT DUY NHẤT:
         Chỉ trả về các dòng lỗi nối tiếp nhau theo đúng định dạng sau:
         
         ❌ `[Line <Số dòng>] <Code gốc>`
-           ↳ **Lỗi:** <Tên lỗi ngắn gọn> (Theo Rule X).
+           ↳ **Lỗi:** <Giải thích lỗi bằng TIẾNG VIỆT> (Theo Rule X).
         
         (Xuống dòng 2 lần giữa các lỗi)
         
-        ❌ `[Line <Số dòng>] ...`
-           ↳ **Lỗi:** ...
-           
         Nếu không có lỗi nào, chỉ ghi đúng 1 từ: "✅ CLEAN CODE".
         """
 
-    # CẤU HÌNH NGÔN NGỮ (NHẬT)
+    # --- NẾU LÀ TIẾNG NHẬT ('ja') ---
     else: 
         system_instruction = """
         あなたは厳格なコード検査ロボットです。
         
         ⛔️ 禁止事項 (STRICT FORBIDDEN):
-        1. 挨拶や導入文は一切禁止です ("こんにちは", "分析結果は..." 等)。
-        2. カテゴリ分け禁止 ("カラムエラー:", "構文エラー:" 等)。
-        3. 結論やまとめ禁止。
+        1. 挨拶や導入文は一切禁止です。
+        2. 結論やまとめ禁止。
         
         ✅ 唯一の出力フォーマット:
         エラーリストのみを以下の形式で出力してください：
         
         ❌ `[Line <行番号>] <元のコード>`
-           ↳ **エラー:** <簡潔なエラー内容> (Rule X).
+           ↳ **エラー:** <日本語でエラー説明> (Rule X).
         
         (エラー間は1行空けること)
         
@@ -99,15 +95,18 @@ def build_prompt(lang_code, rules_text, source_code, lang_prog):
     BẮT ĐẦU QUÉT VÀ CHỈ TRẢ VỀ LIST LỖI:
     """
     return prompt
+
 # ==========================================
-# HÀM GỌI API (CẬP NHẬT)
+# HÀM GỌI API (CẬP NHẬT LOGIC NGÔN NGỮ)
 # ==========================================
-def call_gemini_smart_fallback(rules_text, source_code, lang_prog, selected_lang, active_key):
+def call_gemini_smart_fallback(rules_text, source_code, lang_prog, selected_lang_code, active_key):
     if not active_key:
         return "❌ Error: API Key is missing."
 
-    # Xác định ngôn ngữ cho Prompt ('vi' hoặc 'ja')
-    lang_code = 'vi' if 'Việt' in selected_lang else 'ja'
+    # --- SỬA LỖI LỘN NGÔN NGỮ TẠI ĐÂY ---
+    # Nếu trong mã chọn có chữ 'vi' (ví dụ 'en_vi') -> set là 'vi'
+    # Nếu không -> set là 'ja'
+    lang_code = 'vi' if 'vi' in selected_lang_code.lower() else 'ja'
 
     user_prompt = build_prompt(lang_code, rules_text, source_code, lang_prog)
 
@@ -115,7 +114,6 @@ def call_gemini_smart_fallback(rules_text, source_code, lang_prog, selected_lang
 
     for model_name in MODEL_LIST:
         try:
-            # DÙNG KEY ĐƯỢC TRUYỀN VÀO (active_key)
             url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={active_key}"
             headers = {'Content-Type': 'application/json'}
             payload = {
