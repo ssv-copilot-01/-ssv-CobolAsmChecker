@@ -1,3 +1,4 @@
+import time
 import os
 import time
 import requests
@@ -98,23 +99,25 @@ def build_prompt(lang_code, rules_text, source_code, lang_prog):
     BẮT ĐẦU QUÉT VÀ CHỈ TRẢ VỀ LIST LỖI:
     """
     return prompt
-
 # ==========================================
-# GỌI API
+# HÀM GỌI API (CẬP NHẬT)
 # ==========================================
-def call_gemini_smart_fallback(rules_text, source_code, lang_prog, lang_ui_choice):
-    if not API_KEY: return "❌ Missing API Key"
+def call_gemini_smart_fallback(rules_text, source_code, lang_prog, selected_lang, active_key):
+    if not active_key:
+        return "❌ Error: API Key is missing."
 
-    lang_code = 'vi' if 'Việt' in lang_ui_choice else 'ja'
+    # Xác định ngôn ngữ cho Prompt ('vi' hoặc 'ja')
+    lang_code = 'vi' if 'Việt' in selected_lang else 'ja'
+
     user_prompt = build_prompt(lang_code, rules_text, source_code, lang_prog)
-    
-    print(f"🚀 Robot Audit ({lang_code})...")
+
+    print(f"🚀 Audit ({lang_code}) using Key: {active_key[:5]}...*****")
 
     for model_name in MODEL_LIST:
         try:
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={API_KEY}"
+            # DÙNG KEY ĐƯỢC TRUYỀN VÀO (active_key)
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={active_key}"
             headers = {'Content-Type': 'application/json'}
-            # Temperature = 0.0 để AI không "sáng tạo" thêm lời thoại
             payload = {
                 "contents": [{"parts": [{"text": user_prompt}]}],
                 "generationConfig": {"temperature": 0.0}
@@ -126,9 +129,7 @@ def call_gemini_smart_fallback(rules_text, source_code, lang_prog, lang_ui_choic
                 try:
                     data = response.json()
                     text = data['candidates'][0]['content']['parts'][0]['text']
-                    # Xử lý cắt bỏ các dòng thừa nếu AI vẫn lỡ miệng nói
-                    cleaned_text = text.replace("```markdown", "").replace("```", "").strip()
-                    return f"🚀 **Model: {model_name}**\n\n{cleaned_text}"
+                    return f"🚀 **Model: {model_name}**\n\n{text}"
                 except: continue
             elif response.status_code == 429:
                 delay(1)
@@ -139,4 +140,4 @@ def call_gemini_smart_fallback(rules_text, source_code, lang_prog, lang_ui_choic
             delay(1)
             continue
 
-    return "❌ Service Unavailable."
+    return "❌ Service Unavailable (Check Key or Quota)."

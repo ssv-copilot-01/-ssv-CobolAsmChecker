@@ -1,6 +1,7 @@
 import streamlit as st
 import docx
-import gemini_service 
+import gemini_service
+import key_service
 import os
 from dotenv import load_dotenv
 
@@ -8,10 +9,10 @@ load_dotenv()
 api_key_status = os.getenv("GEMINI_API_KEY")
 
 # ==========================================
-# 1. TỪ ĐIỂN NGÔN NGỮ (I18N)
+# 1. TỪ ĐIỂN NGÔN NGỮ (ĐÃ BỔ SUNG CÁC TỪ KHÓA BỊ THIẾU)
 # ==========================================
 TRANSLATIONS = {
-    "Tiếng Việt": {
+    "Tiếng Việt (ベトナム語)": {
         "page_title": "SSV CODE AUDITOR",
         "subtitle": "Hệ thống kiểm tra quy chuẩn Code tự động",
         "sidebar_config": "⚙️ Cấu hình",
@@ -20,6 +21,13 @@ TRANSLATIONS = {
         "upload_rules": "Upload Quy chuẩn (.docx)",
         "key_ready": "✅ Hệ thống sẵn sàng",
         "key_missing": "❌ Thiếu API Key",
+        # --- CÁC KEY MỚI BỔ SUNG CHO TÍNH NĂNG KEY ---
+        "key_header": "🔑 Quản lý Key",
+        "key_label": "Nhập Key riêng (Tùy chọn):",
+        "key_free_info": "🎁 Dùng thử miễn phí:",
+        "key_limit": "⚠️ Đã hết lượt dùng thử!",
+        "key_personal": "✅ Đang dùng Key cá nhân",
+        # ---------------------------------------------
         "col1_title": "1. Nhập Source Code",
         "prog_lang": "Ngôn ngữ lập trình:",
         "tab_paste": "📝 Dán Code trực tiếp",
@@ -36,13 +44,20 @@ TRANSLATIONS = {
     },
     "日本語 (Tiếng Nhật)": {
         "page_title": "SSV コード監査ツール",
-        "subtitle": "自動コード規約チェックシステム (AI搭載)",#ソースコード自動チェッカーシステム(AI搭載)
+        "subtitle": "ソースコード自動チェッカーシステム(AI搭載)",
         "sidebar_config": "⚙️ 設定",
         "lang_select": "表示言語:",
         "input_data": "📁 入力データ",
         "upload_rules": "規約ファイルをアップロード (.docx)",
         "key_ready": "✅ システム準備完了",
         "key_missing": "❌ APIキーがありません",
+        # --- CÁC KEY MỚI BỔ SUNG CHO TÍNH NĂNG KEY ---
+        "key_header": "🔑 APIキー管理",
+        "key_label": "APIキーを入力 (任意):",
+        "key_free_info": "🎁 無料トライアル:",
+        "key_limit": "⚠️ 上限に達しました！",
+        "key_personal": "✅ 個人キーを使用中",
+        # ---------------------------------------------
         "col1_title": "1. ソースコード入力",
         "prog_lang": "プログラミング言語:",
         "tab_paste": "📝 コード貼り付け",
@@ -60,28 +75,23 @@ TRANSLATIONS = {
 }
 
 # ==========================================
-# 2. UI CONFIG & CSS
+# 2. UI CONFIG & CSS (GIỮ NGUYÊN CSS ĐẸP)
 # ==========================================
 st.set_page_config(page_title="SSV Code Auditor", page_icon="🛡️", layout="wide")
 
 st.markdown("""
 <style>
-    /* CSS CŨ GIỮ NGUYÊN (VÌ NÓ ĐÃ ĐẸP RỒI) */
     .gradient-top-bar {
-        height: 6px;
-        width: 100%;
-        background: linear-gradient(90deg, rgb(2, 3, 129) 0%, rgb(65, 88, 208) 100%);
+        height: 6px; width: 100%; background: linear-gradient(90deg, rgb(2, 3, 129) 0%, rgb(65, 88, 208) 100%);
         position: fixed; top: 0; left: 0; z-index: 99999;
     }
     .stApp { background-color: #F4F6F9 !important; color: #333 !important; font-family: 'Helvetica Neue', sans-serif; }
     h1, h2, h3, h4, strong { color: rgb(2, 3, 129) !important; font-weight: 800 !important; }
     
-    /* INPUTS */
     .stTextArea textarea, .stTextInput input, .stSelectbox div[data-baseweb="select"] {
         background-color: #FFFFFF !important; border: 1px solid #94A3B8 !important; color: #0F172A !important;
     }
     
-    /* BUTTON */
     div.stButton > button:first-child {
         background-image: linear-gradient(90deg, rgb(2, 3, 129) 0%, rgb(65, 88, 208) 100%);
         color: #FFFFFF !important; border: none; border-radius: 50px;
@@ -90,7 +100,6 @@ st.markdown("""
     }
     div.stButton > button:first-child:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(2, 3, 129, 0.35); }
 
-    /* REPORT BOX */
     .report-box {
         background-color: #FFFFFF; padding: 30px; border-radius: 8px;
         border: 1px solid #E2E8F0; border-left: 6px solid rgb(2, 3, 129);
@@ -117,7 +126,7 @@ def read_code_file(f):
     except Exception as e: return str(e)
 
 # ==========================================
-# 3. SIDEBAR (CHỌN NGÔN NGỮ ĐẦU TIÊN)
+# 3. SIDEBAR (LOGIC KEY SERVICE)
 # ==========================================
 with st.sidebar:
     st.markdown("""
@@ -126,22 +135,36 @@ with st.sidebar:
         </div>
     """, unsafe_allow_html=True)
     
+    # CHỌN NGÔN NGỮ
     st.header("🌐 Language / 言語")
-    
-    # --- RADIO CHỌN NGÔN NGỮ ---
     selected_lang = st.radio(
         "Display Language:",
-        options=["Tiếng Việt", "日本語 (Tiếng Nhật)"],
+        options=["Tiếng Việt (ベトナム語)", "日本語 (Tiếng Nhật)"],
         index=0
     )
-    
-    # Lấy bộ từ điển tương ứng
     T = TRANSLATIONS[selected_lang]
     
     st.markdown("---")
-    st.header(T["sidebar_config"])
     
-    st.subheader(T["input_data"])
+    # --- PHẦN QUẢN LÝ KEY (Đã có từ điển T['key_header'] hỗ trợ) ---
+    st.header(T["key_header"])
+    user_input_key = st.text_input(T["key_label"], type="password")
+    
+    used, limit = key_service.get_usage_info()
+    
+    if user_input_key:
+        st.success(T["key_personal"])
+    else:
+        percent = int((used / limit) * 100)
+        st.info(f"{T['key_free_info']} {used}/{limit}")
+        st.progress(percent)
+        if used >= limit:
+            st.error(T["key_limit"])
+
+    st.markdown("---")
+    
+    # UPLOAD RULES
+    st.header(T["sidebar_config"])
     uploaded_rule = st.file_uploader(T["upload_rules"], type=["docx"])
     
     st.markdown("---")
@@ -151,7 +174,7 @@ with st.sidebar:
         st.error(T["key_missing"])
 
 # ==========================================
-# 4. MAIN CONTENT (HIỂN THỊ THEO NGÔN NGỮ ĐÃ CHỌN)
+# 4. MAIN CONTENT
 # ==========================================
 st.markdown(f"# {T['page_title']}")
 st.caption(T['subtitle'])
@@ -163,7 +186,7 @@ with col1:
     st.markdown(f"### {T['col1_title']}")
     language = st.selectbox(T["prog_lang"], ["COBOL", "ASSEMBLY"], index=0)
     
-    tab1, tab2 = st.tabs([T["tab_paste"], T["tab_upload"]])
+    tab2, tab1 = st.tabs([T["tab_upload"], T["tab_paste"]])
     final_code = ""
     
     with tab1:
@@ -174,15 +197,17 @@ with col1:
         if up_file: final_code = read_code_file(up_file)
 
     st.write("")
-    # Nút bấm cũng đổi chữ theo ngôn ngữ
     btn_run = st.button(T["btn_run"], type="primary", use_container_width=True)
 
 with col2:
     st.markdown(f"### {T['col2_title']}")
     
     if btn_run:
-        if not api_key_status:
-            st.error(T["error_env"])
+        # XỬ LÝ KEY
+        final_key, key_type, error_msg = key_service.resolve_api_key(user_input_key)
+        
+        if error_msg:
+            st.error(error_msg)
         elif not uploaded_rule:
             st.error(T["error_rules"])
         elif not final_code.strip():
@@ -192,23 +217,29 @@ with col2:
                 try:
                     rules_content = read_docx(uploaded_rule)
                     
-                    # Gọi Service với tham số ngôn ngữ đã chọn
+                    # Truyền style_code (vi/ja) cho Service
+                    style_code = 'vi' if "Tiếng Việt" in selected_lang else 'ja'
+                    
                     raw_result = gemini_service.call_gemini_smart_fallback(
                         rules_content, 
                         final_code, 
                         language,
-                        selected_lang # Truyền ngôn ngữ vào service để chỉnh Prompt
+                        style_code, # Truyền 'vi' hoặc 'ja'
+                        final_key
                     )
                     
-                    import markdown
-                    html_content = markdown.markdown(raw_result)
-                    
-                    st.markdown(f"""
-                    <div class="report-box">
-                        {html_content}
-                    </div>
-                    """, unsafe_allow_html=True)
-                    
+                    if "❌" not in raw_result:
+                        key_service.mark_as_used(key_type)
+                        import markdown
+                        html_content = markdown.markdown(raw_result)
+                        st.markdown(f'<div class="report-box">{html_content}</div>', unsafe_allow_html=True)
+                        
+                        # Refresh để update thanh tiến trình
+                        time.sleep(1)
+                        st.rerun()
+                    else:
+                        st.error(raw_result)
+                        
                 except Exception as e:
                     st.error(f"Error: {e}")
 
